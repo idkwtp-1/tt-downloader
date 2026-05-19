@@ -1,122 +1,212 @@
 import { useState } from 'react'
+import { Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Download } from 'lucide-react'
 import Header from './components/Header'
-import InputSection from './components/InputSection'
-import VideoPreview from './components/VideoPreview'
 
 function App() {
-  const [videos, setVideos] = useState([])
+  const [inputs, setInputs] = useState([''])
+  const [statuses, setStatuses] = useState(['idle']) // 'idle', 'loading', 'success', 'error'
+  const [errors, setErrors] = useState([''])
+  const [isDownloading, setIsDownloading] = useState(false)
 
-  const handleFetchVideo = async (url) => {
-    const videoId = Math.random().toString(36).substr(2, 9)
+  const handleInputChange = (index, value) => {
+    const newInputs = [...inputs]
+    newInputs[index] = value
+    setInputs(newInputs)
     
-    // Add to list immediately as loading
-    setVideos(prev => [{
-      id: videoId,
-      url,
-      loading: true,
-      error: null,
-      data: null
-    }, ...prev])
-
-    try {
-      const response = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)
-      const data = await response.json()
-
-      if (data.code === 0 && data.data) {
-        setVideos(prev => prev.map(v => 
-          v.id === videoId ? { ...v, data: data.data, loading: false } : v
-        ))
-      } else {
-        setVideos(prev => prev.map(v => 
-          v.id === videoId ? { ...v, error: 'Failed to fetch video. Please check the URL.', loading: false } : v
-        ))
-      }
-    } catch (err) {
-      setVideos(prev => prev.map(v => 
-        v.id === videoId ? { ...v, error: 'An error occurred. Please try again.', loading: false } : v
-      ))
-    }
+    // Reset status for this input
+    const newStatuses = [...statuses]
+    newStatuses[index] = 'idle'
+    setStatuses(newStatuses)
+    
+    const newErrors = [...errors]
+    newErrors[index] = ''
+    setErrors(newErrors)
   }
 
-  const removeVideo = (id) => {
-    setVideos(prev => prev.filter(v => v.id !== id))
+  const addInput = () => {
+    setInputs([...inputs, ''])
+    setStatuses([...statuses, 'idle'])
+    setErrors([...errors, ''])
   }
 
-  const clearAll = () => {
-    setVideos([])
+  const removeInput = (index) => {
+    const newInputs = inputs.filter((_, i) => i !== index)
+    const newStatuses = statuses.filter((_, i) => i !== index)
+    const newErrors = errors.filter((_, i) => i !== index)
+    
+    setInputs(newInputs.length ? newInputs : [''])
+    setStatuses(newStatuses.length ? newStatuses : ['idle'])
+    setErrors(newErrors.length ? newErrors : [''])
   }
 
-  const downloadAll = async () => {
-    for (const video of videos) {
-      if (video.data?.play) {
-        try {
-          const videoUrl = video.data.play
-          const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(videoUrl)
-          const response = await fetch(proxyUrl)
-          if (!response.ok) throw new Error('Fetch failed')
-          const blob = await response.blob()
-          const blobUrl = window.URL.createObjectURL(blob)
+  const handleDownloadAll = async (e) => {
+    e.preventDefault()
+    
+    // Filter out empty URLs
+    const activeIndices = []
+    inputs.forEach((url, index) => {
+      if (url.trim()) activeIndices.push(index)
+    })
+
+    if (activeIndices.length === 0) return
+
+    setIsDownloading(true)
+
+    // Set active ones to loading
+    setStatuses(prev => {
+      const next = [...prev]
+      activeIndices.forEach(idx => next[idx] = 'loading')
+      return next
+    })
+    setErrors(prev => {
+      const next = [...prev]
+      activeIndices.forEach(idx => next[idx] = '')
+      return next
+    })
+
+    for (let count = 0; count < activeIndices.length; count++) {
+      const index = activeIndices[count]
+      const url = inputs[index].trim()
+
+      try {
+        const response = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)
+        const data = await response.json()
+
+        if (data.code === 0 && data.data && data.data.play) {
+          const playUrl = data.data.play
+          const videoId = data.data.id || 'tiktok-video'
           
-          const a = document.createElement('a')
-          a.style.display = 'none'
-          a.href = blobUrl
-          a.download = (video.data.id || 'tiktok-video') + '.mp4'
-          document.body.appendChild(a)
-          a.click()
+          // Setup direct download headers with proxy
+          const filename = `${videoId}.mp4`
+          const resHeaders = `content-disposition:attachment; filename="${filename}"`
+          const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(playUrl)}&resHeaders=${encodeURIComponent(resHeaders)}`
           
-          document.body.removeChild(a)
-          window.URL.revokeObjectURL(blobUrl)
-          
-          // Small delay to prevent bottlenecking the browser
-          await new Promise(resolve => setTimeout(resolve, 600))
-        } catch (err) {
-          console.error('Failed to download direct, opening in tab:', err)
-          window.open(video.data.play, '_blank')
+          // Trigger download via iframe
+          const iframe = document.createElement('iframe')
+          iframe.style.display = 'none'
+          iframe.src = proxyUrl
+          document.body.appendChild(iframe)
+          setTimeout(() => document.body.removeChild(iframe), 5000)
+
+          setStatuses(prev => {
+            const next = [...prev]
+            next[index] = 'success'
+            return next
+          })
+        } else {
+          throw new Error(data.msg || 'Unable to parse download link.')
         }
+      } catch (err) {
+        console.error('Download failed for index', index, err)
+        setStatuses(prev => {
+          const next = [...prev]
+          next[index] = 'error'
+          return next
+        })
+        setErrors(prev => {
+          const next = [...prev]
+          next[index] = err.message || 'Fetch failed'
+          return next
+        })
+      }
+
+      // Sequential request throttle delay
+      if (count < activeIndices.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 800))
       }
     }
+
+    setIsDownloading(false)
   }
+
+  const hasMultipleInputs = inputs.length > 1
+  const isFormValid = inputs.some(url => url.trim().length > 0)
 
   return (
     <div className="min-h-screen">
       <Header />
       <div className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
-        <InputSection 
-          onFetchVideo={handleFetchVideo} 
-        />
-        
-        {videos.length > 0 && (
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-            <h2 className="text-xl font-semibold text-white">
-              Results ({videos.length})
-            </h2>
-            <div className="flex flex-wrap gap-3">
-              <button 
-                onClick={downloadAll}
-                className="px-4 py-2 bg-tiktok-cyan/20 text-tiktok-cyan border border-tiktok-cyan/30 rounded-lg text-sm font-medium hover:bg-tiktok-cyan/30 transition-colors"
+        <div className="bg-tiktok-gray/40 backdrop-blur-md rounded-2xl p-6 border border-gray-800">
+          <form onSubmit={handleDownloadAll} className="space-y-4">
+            {inputs.map((url, index) => (
+              <div key={index} className="flex flex-col gap-1">
+                <div className="flex gap-3 items-center">
+                  <div className="flex-1 relative">
+                    <input
+                      type="text"
+                      value={url}
+                      onChange={(e) => handleInputChange(index, e.target.value)}
+                      placeholder={`Paste TikTok video URL ${hasMultipleInputs ? index + 1 : ''} here...`}
+                      disabled={isDownloading}
+                      className="w-full px-5 py-4 bg-tiktok-gray border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-tiktok-cyan focus:ring-1 focus:ring-tiktok-cyan transition-all disabled:opacity-70"
+                    />
+                    
+                    {/* Status Icons */}
+                    <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      {statuses[index] === 'loading' && (
+                        <Loader2 className="w-5 h-5 text-tiktok-cyan animate-spin" />
+                      )}
+                      {statuses[index] === 'success' && (
+                        <CheckCircle2 className="w-5 h-5 text-green-400" />
+                      )}
+                      {statuses[index] === 'error' && (
+                        <AlertCircle className="w-5 h-5 text-red-500" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  {hasMultipleInputs && (
+                    <button
+                      type="button"
+                      onClick={() => removeInput(index)}
+                      disabled={isDownloading}
+                      className="p-4 bg-gray-800/80 text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-gray-700 rounded-xl transition-all disabled:opacity-50"
+                      title="Remove link"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
+                </div>
+                
+                {/* Error message */}
+                {statuses[index] === 'error' && errors[index] && (
+                  <p className="text-red-400 text-xs px-2 mt-1">
+                    Error: {errors[index]}
+                  </p>
+                )}
+              </div>
+            ))}
+
+            <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-800/60">
+              <button
+                type="button"
+                onClick={addInput}
+                disabled={isDownloading}
+                className="px-6 py-4 bg-gray-800 text-white border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all flex items-center gap-2 font-medium disabled:opacity-50"
               >
-                Download All
+                <Plus className="w-5 h-5" />
+                Add Link
               </button>
-              <button 
-                onClick={clearAll}
-                className="px-4 py-2 bg-gray-800 text-gray-400 border border-gray-700 rounded-lg text-sm font-medium hover:text-white hover:bg-gray-700 transition-colors"
+              
+              <button
+                type="submit"
+                disabled={!isFormValid || isDownloading}
+                className="px-8 py-4 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white font-semibold rounded-xl hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
-                Clear All
+                {isDownloading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Downloading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5" />
+                    <span>{hasMultipleInputs ? 'Download All' : 'Download'}</span>
+                  </>
+                )}
               </button>
             </div>
-          </div>
-        )}
-
-        <div className="space-y-6">
-          {videos.map((video) => (
-            <VideoPreview 
-              key={video.id} 
-              videoData={video.data}
-              loading={video.loading}
-              error={video.error}
-              onRemove={() => removeVideo(video.id)}
-            />
-          ))}
+          </form>
         </div>
       </div>
     </div>
