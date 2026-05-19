@@ -1,7 +1,7 @@
-import { Download, Copy, Check } from 'lucide-react'
+import { Download, Copy, Check, X, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
-function VideoPreview({ videoData }) {
+function VideoPreview({ videoData, loading, error, onRemove }) {
   const [copied, setCopied] = useState(false)
 
   const handleCopy = (text) => {
@@ -10,11 +10,50 @@ function VideoPreview({ videoData }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  if (loading) {
+    return (
+      <div className="bg-tiktok-gray rounded-2xl p-6 border border-gray-800 flex flex-col items-center justify-center min-h-[200px] relative">
+        <button 
+          onClick={onRemove}
+          className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <Loader2 className="w-8 h-8 text-tiktok-cyan animate-spin mb-4" />
+        <p className="text-gray-400">Fetching video details...</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="bg-tiktok-gray rounded-2xl p-6 border border-red-500/30 flex flex-col items-center justify-center min-h-[150px] relative">
+        <button 
+          onClick={onRemove}
+          className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors"
+        >
+          <X className="w-5 h-5" />
+        </button>
+        <p className="text-red-400 mb-2">Error</p>
+        <p className="text-gray-400 text-center">{error}</p>
+      </div>
+    )
+  }
+
+  if (!videoData) return null
+
   return (
-    <div className="bg-tiktok-gray rounded-2xl p-4 sm:p-6 border border-gray-800">
+    <div className="bg-tiktok-gray rounded-2xl p-4 sm:p-6 border border-gray-800 relative group">
+      <button 
+        onClick={onRemove}
+        className="absolute top-4 right-4 text-gray-500 hover:text-white transition-colors z-10"
+      >
+        <X className="w-5 h-5" />
+      </button>
+
       <div className="flex flex-col md:flex-row gap-4 md:gap-6">
         {/* Thumbnail */}
-        <div className="md:w-1/2 mx-auto md:mx-0 max-w-xs">
+        <div className="md:w-1/3 lg:w-1/4 mx-auto md:mx-0">
           <img
             src={videoData.cover}
             alt="Video thumbnail"
@@ -23,8 +62,8 @@ function VideoPreview({ videoData }) {
         </div>
 
         {/* Video Info */}
-        <div className="md:w-1/2 flex flex-col">
-          <h2 className="text-xl font-semibold text-white mb-2 line-clamp-2">
+        <div className="flex-1 flex flex-col">
+          <h2 className="text-xl font-semibold text-white mb-2 line-clamp-2 pr-8">
             {videoData.title || 'TikTok Video'}
           </h2>
           
@@ -48,27 +87,16 @@ function VideoPreview({ videoData }) {
           </div>
 
           {/* Download Options */}
-          <div className="mt-auto space-y-3">
+          <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* HD Quality */}
             {videoData.play && (
               <a
                 href={videoData.play}
-                download
-                className="flex items-center justify-between w-full px-4 py-3 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white rounded-xl hover:opacity-90 transition-opacity"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white rounded-xl hover:opacity-90 transition-opacity"
               >
                 <span className="font-medium">HD Quality</span>
-                <Download className="w-5 h-5" />
-              </a>
-            )}
-
-            {/* Normal Quality */}
-            {videoData.wm && (
-              <a
-                href={videoData.wm}
-                download
-                className="flex items-center justify-between w-full px-4 py-3 bg-gray-700 text-white rounded-xl hover:bg-gray-600 transition-colors"
-              >
-                <span className="font-medium">Normal Quality</span>
                 <Download className="w-5 h-5" />
               </a>
             )}
@@ -77,9 +105,9 @@ function VideoPreview({ videoData }) {
             {videoData.play && (
               <button
                 onClick={() => handleCopy(videoData.play)}
-                className="flex items-center justify-between w-full px-4 py-3 bg-gray-800 text-gray-300 rounded-xl hover:bg-gray-700 transition-colors"
+                className="flex items-center justify-between px-4 py-3 bg-gray-800 text-gray-300 rounded-xl hover:bg-gray-700 transition-colors"
               >
-                <span className="font-medium">Copy HD Link</span>
+                <span className="font-medium">Copy Link</span>
                 {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
               </button>
             )}
