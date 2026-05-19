@@ -69,6 +69,7 @@ function App() {
       const url = inputs[index].trim()
 
       try {
+        // Step 1: Fetch download link from TikWM API
         const response = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)
         const data = await response.json()
 
@@ -76,17 +77,25 @@ function App() {
           const playUrl = data.data.play
           const videoId = data.data.id || 'tiktok-video'
           
-          // Setup direct download headers with proxy
-          const filename = `${videoId}.mp4`
-          const resHeaders = `content-disposition:attachment; filename="${filename}"`
-          const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(playUrl)}&resHeaders=${encodeURIComponent(resHeaders)}`
+          // Step 2: Fetch the file as a Blob using corsproxy.io to bypass CORS
+          const proxyUrl = `https://corsproxy.io/?${encodeURIComponent(playUrl)}`
+          const fileResponse = await fetch(proxyUrl)
+          if (!fileResponse.ok) throw new Error('Failed to fetch video file from server.')
           
-          // Trigger download via iframe
-          const iframe = document.createElement('iframe')
-          iframe.style.display = 'none'
-          iframe.src = proxyUrl
-          document.body.appendChild(iframe)
-          setTimeout(() => document.body.removeChild(iframe), 5000)
+          const blob = await fileResponse.blob()
+          const blobUrl = window.URL.createObjectURL(blob)
+          
+          // Step 3: Trigger browser download programmatically
+          const a = document.createElement('a')
+          a.style.display = 'none'
+          a.href = blobUrl
+          a.download = `${videoId}.mp4`
+          document.body.appendChild(a)
+          a.click()
+          
+          // Cleanup
+          document.body.removeChild(a)
+          window.URL.revokeObjectURL(blobUrl)
 
           setStatuses(prev => {
             const next = [...prev]
@@ -110,9 +119,9 @@ function App() {
         })
       }
 
-      // Sequential request throttle delay
+      // Sequential request throttle delay to prevent API rate limits
       if (count < activeIndices.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 800))
+        await new Promise(resolve => setTimeout(resolve, 1000))
       }
     }
 
@@ -126,7 +135,7 @@ function App() {
     <div className="min-h-screen">
       <Header />
       <div className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
-        <div className="bg-tiktok-gray/40 backdrop-blur-md rounded-2xl p-6 border border-gray-800">
+        <div className="bg-tiktok-gray/40 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-gray-800">
           <form onSubmit={handleDownloadAll} className="space-y-4">
             {inputs.map((url, index) => (
               <div key={index} className="flex flex-col gap-1">
@@ -138,7 +147,7 @@ function App() {
                       onChange={(e) => handleInputChange(index, e.target.value)}
                       placeholder={`Paste TikTok video URL ${hasMultipleInputs ? index + 1 : ''} here...`}
                       disabled={isDownloading}
-                      className="w-full px-5 py-4 bg-tiktok-gray border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-tiktok-cyan focus:ring-1 focus:ring-tiktok-cyan transition-all disabled:opacity-70"
+                      className="w-full px-4 py-3 sm:px-5 sm:py-4 bg-tiktok-gray border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-tiktok-cyan focus:ring-1 focus:ring-tiktok-cyan text-sm sm:text-base transition-all disabled:opacity-70 pr-12"
                     />
                     
                     {/* Status Icons */}
@@ -160,7 +169,7 @@ function App() {
                       type="button"
                       onClick={() => removeInput(index)}
                       disabled={isDownloading}
-                      className="p-4 bg-gray-800/80 text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-gray-700 rounded-xl transition-all disabled:opacity-50"
+                      className="p-3 sm:p-4 bg-gray-800/80 text-gray-400 hover:text-red-400 hover:bg-red-500/10 border border-gray-700 rounded-xl transition-all disabled:opacity-50"
                       title="Remove link"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -177,30 +186,31 @@ function App() {
               </div>
             ))}
 
-            <div className="flex flex-wrap gap-3 justify-end pt-4 border-t border-gray-800/60">
+            {/* Bottom Actions Layout (Always side-by-side) */}
+            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-800/60">
               <button
                 type="button"
                 onClick={addInput}
                 disabled={isDownloading}
-                className="px-6 py-4 bg-gray-800 text-white border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all flex items-center gap-2 font-medium disabled:opacity-50"
+                className="px-4 py-3 sm:px-6 sm:py-4 bg-gray-800 text-white border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all flex items-center justify-center gap-2 text-sm sm:text-base font-medium disabled:opacity-50"
               >
-                <Plus className="w-5 h-5" />
+                <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                 Add Link
               </button>
               
               <button
                 type="submit"
                 disabled={!isFormValid || isDownloading}
-                className="px-8 py-4 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white font-semibold rounded-xl hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="px-4 py-3 sm:px-8 sm:py-4 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white text-sm sm:text-base font-semibold rounded-xl hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isDownloading ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
                     <span>Downloading...</span>
                   </>
                 ) : (
                   <>
-                    <Download className="w-5 h-5" />
+                    <Download className="w-4 h-4 sm:w-5 sm:h-5" />
                     <span>{hasMultipleInputs ? 'Download All' : 'Download'}</span>
                   </>
                 )}
