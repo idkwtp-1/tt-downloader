@@ -46,23 +46,34 @@ function App() {
     setVideos([])
   }
 
-  const downloadAll = () => {
-    videos.forEach(video => {
+  const downloadAll = async () => {
+    for (const video of videos) {
       if (video.data?.play) {
-        window.open(video.data.play, '_blank')
+        try {
+          const videoUrl = video.data.play
+          const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(videoUrl)
+          const response = await fetch(proxyUrl)
+          if (!response.ok) throw new Error('Fetch failed')
+          const blob = await response.blob()
+          const blobUrl = window.URL.createObjectURL(blob)
+          
+          const a = document.createElement('a')
+          a.style.display = 'none'
+          a.href = blobUrl
+          a.download = (video.data.id || 'tiktok-video') + '.mp4'
+          document.body.appendChild(a)
+          a.click()
+          
+          document.body.removeChild(a)
+          window.URL.revokeObjectURL(blobUrl)
+          
+          // Small delay to prevent bottlenecking the browser
+          await new Promise(resolve => setTimeout(resolve, 600))
+        } catch (err) {
+          console.error('Failed to download direct, opening in tab:', err)
+          window.open(video.data.play, '_blank')
+        }
       }
-    })
-  }
-
-  const copyAllLinks = () => {
-    const links = videos
-      .filter(v => v.data?.play)
-      .map(v => v.data.play)
-      .join('\n')
-    
-    if (links) {
-      navigator.clipboard.writeText(links)
-      alert('All video links copied to clipboard!')
     }
   }
 
@@ -85,12 +96,6 @@ function App() {
                 className="px-4 py-2 bg-tiktok-cyan/20 text-tiktok-cyan border border-tiktok-cyan/30 rounded-lg text-sm font-medium hover:bg-tiktok-cyan/30 transition-colors"
               >
                 Download All
-              </button>
-              <button 
-                onClick={copyAllLinks}
-                className="px-4 py-2 bg-tiktok-pink/20 text-tiktok-pink border border-tiktok-pink/30 rounded-lg text-sm font-medium hover:bg-tiktok-pink/30 transition-colors"
-              >
-                Copy All Links
               </button>
               <button 
                 onClick={clearAll}
@@ -118,4 +123,4 @@ function App() {
   )
 }
 
-export default App
+export default App;

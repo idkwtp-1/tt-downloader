@@ -1,13 +1,42 @@
-import { Download, Copy, Check, X, Loader2 } from 'lucide-react'
+import { Download, X, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
 function VideoPreview({ videoData, loading, error, onRemove }) {
-  const [copied, setCopied] = useState(false)
+  const [downloadingFile, setDownloadingFile] = useState(false)
 
-  const handleCopy = (text) => {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const handleDownload = async (e) => {
+    e.preventDefault()
+    if (!videoData.play) return
+
+    setDownloadingFile(true)
+    try {
+      const videoUrl = videoData.play
+      // Use corsproxy.io to bypass CORS for fetching the MP4 blob directly
+      const proxyUrl = 'https://corsproxy.io/?' + encodeURIComponent(videoUrl)
+      
+      const response = await fetch(proxyUrl)
+      if (!response.ok) throw new Error('Network response was not ok')
+      
+      const blob = await response.blob()
+      const blobUrl = window.URL.createObjectURL(blob)
+      
+      const a = document.createElement('a')
+      a.style.display = 'none'
+      a.href = blobUrl
+      a.download = (videoData.id || 'tiktok-video') + '.mp4'
+      document.body.appendChild(a)
+      a.click()
+      
+      // Cleanup
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(blobUrl)
+    } catch (err) {
+      console.error('Direct download failed, falling back to opening in a new tab:', err)
+      // Fallback: Open in a new tab
+      window.open(videoData.play, '_blank')
+    } finally {
+      setDownloadingFile(false)
+    }
   }
 
   if (loading) {
@@ -86,29 +115,20 @@ function VideoPreview({ videoData, loading, error, onRemove }) {
             </div>
           </div>
 
-          {/* Download Options */}
-          <div className="mt-auto grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* HD Quality */}
-            {videoData.play && (
-              <a
-                href={videoData.play}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white rounded-xl hover:opacity-90 transition-opacity"
-              >
-                <span className="font-medium">HD Quality</span>
-                <Download className="w-5 h-5" />
-              </a>
-            )}
-
-            {/* No Watermark */}
+          {/* Download Button */}
+          <div className="mt-auto">
             {videoData.play && (
               <button
-                onClick={() => handleCopy(videoData.play)}
-                className="flex items-center justify-between px-4 py-3 bg-gray-800 text-gray-300 rounded-xl hover:bg-gray-700 transition-colors"
+                onClick={handleDownload}
+                disabled={downloadingFile}
+                className="flex items-center justify-between w-full px-5 py-4 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white rounded-xl hover:opacity-90 transition-all font-semibold disabled:opacity-75 disabled:cursor-not-allowed"
               >
-                <span className="font-medium">Copy Link</span>
-                {copied ? <Check className="w-5 h-5 text-green-400" /> : <Copy className="w-5 h-5" />}
+                <span>{downloadingFile ? 'Downloading...' : 'Download Video'}</span>
+                {downloadingFile ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Download className="w-5 h-5" />
+                )}
               </button>
             )}
           </div>
@@ -118,4 +138,4 @@ function VideoPreview({ videoData, loading, error, onRemove }) {
   )
 }
 
-export default VideoPreview
+export default VideoPreview;
