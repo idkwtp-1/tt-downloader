@@ -1,15 +1,21 @@
-import { FFmpeg } from '@ffmpeg/ffmpeg'
-import { toBlobURL, fetchFile } from '@ffmpeg/util'
-
 let ffmpeg = null
 let ffmpegLoaded = false
 let loadingPromise = null
+let fetchFileFn = null
 
 export async function ensureFFmpeg() {
   if (ffmpegLoaded) return ffmpeg
   if (loadingPromise) return loadingPromise
 
   loadingPromise = (async () => {
+    // Dynamic import from CDN to avoid build-time bundling issues
+    const ffmpegModule = await import(/* @vite-ignore */ 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js')
+    const utilModule = await import(/* @vite-ignore */ 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js')
+
+    const FFmpeg = ffmpegModule.FFmpeg
+    const toBlobURL = utilModule.toBlobURL
+    fetchFileFn = utilModule.fetchFile
+
     ffmpeg = new FFmpeg()
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
 
@@ -45,7 +51,7 @@ export async function applyFastStart(blob) {
     const inputName = 'input.mp4'
     const outputName = 'output.mp4'
     
-    await instance.writeFile(inputName, await fetchFile(blob))
+    await instance.writeFile(inputName, await fetchFileFn(blob))
     await instance.exec(['-i', inputName, '-c', 'copy', '-movflags', '+faststart', outputName])
     const fixedData = await instance.readFile(outputName)
     
