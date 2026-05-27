@@ -12,9 +12,17 @@ export async function ensureFFmpeg() {
   loadingPromise = (async () => {
     ffmpeg = new FFmpeg()
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/umd'
+
+    // Create a Blob URL wrapping the CDN worker script to bypass CORS security constraints and local 404 errors.
+    const workerURL = 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.10/dist/esm/worker.js'
+    const blobCode = `import "${workerURL}";`
+    const blob = new Blob([blobCode], { type: 'text/javascript' })
+    const classWorkerURL = URL.createObjectURL(blob)
+
     await ffmpeg.load({
       coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
+      classWorkerURL
     })
     ffmpegLoaded = true
     return ffmpeg
