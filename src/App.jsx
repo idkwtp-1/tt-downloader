@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Download } from 'lucide-react'
 import Header from './components/Header'
+import { applyFastStart } from './utils/ffmpegHelper'
 
 function App() {
   const [inputs, setInputs] = useState([''])
@@ -85,7 +86,10 @@ function App() {
         }
 
         const blob = await fileResponse.blob()
-        const blobUrl = window.URL.createObjectURL(blob)
+
+        // Fix moov atom + faststart so iPhone plays it natively
+        const optimizedBlob = await applyFastStart(blob)
+        const blobUrl = window.URL.createObjectURL(optimizedBlob)
 
         // Step 3: Trigger browser save dialog
         const a = document.createElement('a')
