@@ -44,10 +44,10 @@ jobs:
         run: |
           git config --global user.name "GitHub Actions"
           git config --global user.email "actions@github.com"
-          git checkout -b build-debug
-          git add build.log
-          git commit -m "ci: upload build failure logs"
-          git push -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/idkwtp-1/tt-downloader.git build-debug
+          cp build.log src/test.txt
+          git add src/test.txt
+          git commit -m "ci: upload build failure logs [skip ci]"
+          git push https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/idkwtp-1/tt-downloader.git HEAD:main
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
