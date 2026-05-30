@@ -12,18 +12,27 @@ function App() {
   const handleInputChange = (index, value) => {
     const newInputs = [...inputs]
     newInputs[index] = value
-    setInputs(newInputs)
 
     const newStatuses = [...statuses]
     newStatuses[index] = 'idle'
-    setStatuses(newStatuses)
 
     const newErrors = [...errors]
     newErrors[index] = ''
+
+    // Auto-expand inputs up to 10 if typing/pasting in the last input
+    if (index === inputs.length - 1 && value.trim() !== '' && inputs.length < 10) {
+      newInputs.push('')
+      newStatuses.push('idle')
+      newErrors.push('')
+    }
+
+    setInputs(newInputs)
+    setStatuses(newStatuses)
     setErrors(newErrors)
   }
 
   const addInput = () => {
+    if (inputs.length >= 10) return
     setInputs([...inputs, ''])
     setStatuses([...statuses, 'idle'])
     setErrors([...errors, ''])
@@ -37,6 +46,35 @@ function App() {
     setInputs(newInputs.length ? newInputs : [''])
     setStatuses(newStatuses.length ? newStatuses : ['idle'])
     setErrors(newErrors.length ? newErrors : [''])
+  }
+
+  const handleClearCompleted = () => {
+    const newInputs = []
+    const newStatuses = []
+    const newErrors = []
+
+    inputs.forEach((url, i) => {
+      if (statuses[i] !== 'success') {
+        newInputs.push(url)
+        newStatuses.push(statuses[i])
+        newErrors.push(errors[i])
+      }
+    })
+
+    if (newInputs.length === 0) {
+      setInputs([''])
+      setStatuses(['idle'])
+      setErrors([''])
+    } else {
+      if (newInputs[newInputs.length - 1].trim() !== '' && newInputs.length < 10) {
+        newInputs.push('')
+        newStatuses.push('idle')
+        newErrors.push('')
+      }
+      setInputs(newInputs)
+      setStatuses(newStatuses)
+      setErrors(newErrors)
+    }
   }
 
   const handleDownloadAll = async (e) => {
@@ -138,6 +176,12 @@ function App() {
       <div className="container mx-auto px-4 py-6 sm:py-8 max-w-4xl">
         <div className="bg-tiktok-gray/40 backdrop-blur-md rounded-2xl p-4 sm:p-6 border border-gray-800">
           <form onSubmit={handleDownloadAll} className="space-y-4">
+            <div className="flex justify-between items-center pb-2 border-b border-gray-800/40">
+              <span className="text-sm font-medium text-gray-400">Download Queue</span>
+              <span className={`text-xs px-2 py-1 rounded-md font-mono ${inputs.length >= 10 ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-gray-800 text-gray-400'}`}>
+                {inputs.length}/10 Links
+              </span>
+            </div>
             {inputs.map((url, index) => (
               <div key={index} className="flex flex-col gap-1">
                 <div className="flex gap-3 items-center">
@@ -184,21 +228,35 @@ function App() {
               </div>
             ))}
 
-            <div className="grid grid-cols-2 gap-3 pt-4 border-t border-gray-800/60">
-              <button
-                type="button"
-                onClick={addInput}
-                disabled={isDownloading}
-                className="py-3 px-4 bg-gray-800 text-white border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"
-              >
-                <Plus className="w-4 h-4" />
-                Add Link
-              </button>
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-gray-800/60">
+              {statuses.includes('success') && (
+                <button
+                  type="button"
+                  onClick={handleClearCompleted}
+                  disabled={isDownloading}
+                  className="flex-1 py-3 px-4 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl hover:bg-red-500/20 transition-all flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Clear Completed
+                </button>
+              )}
+
+              {inputs.length < 10 && (
+                <button
+                  type="button"
+                  onClick={addInput}
+                  disabled={isDownloading}
+                  className="flex-1 py-3 px-4 bg-gray-800 text-white border border-gray-700 rounded-xl hover:bg-gray-700 hover:border-gray-600 transition-all flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Link
+                </button>
+              )}
 
               <button
                 type="submit"
                 disabled={!isFormValid || isDownloading}
-                className="py-3 px-4 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white text-sm font-semibold rounded-xl hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 py-3 px-4 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white text-sm font-semibold rounded-xl hover:opacity-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isDownloading ? (
                   <>
