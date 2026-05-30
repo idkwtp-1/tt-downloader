@@ -47,7 +47,7 @@ jobs:
           git checkout -b build-debug
           git add build.log
           git commit -m "ci: upload build failure logs"
-          git push -f origin build-debug
+          git push -f https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/idkwtp-1/tt-downloader.git build-debug
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
