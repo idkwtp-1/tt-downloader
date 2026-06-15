@@ -48,8 +48,9 @@ export async function ensureFFmpeg() {
 export async function applyFastStart(blob) {
   try {
     const instance = await ensureFFmpeg()
-    const inputName = 'input.mp4'
-    const outputName = 'output.mp4'
+    const id = Math.random().toString(36).substring(2, 9)
+    const inputName = `input_${id}.mp4`
+    const outputName = `output_${id}.mp4`
     
     await instance.writeFile(inputName, await fetchFileFn(blob))
     await instance.exec(['-i', inputName, '-c', 'copy', '-movflags', '+faststart', outputName])

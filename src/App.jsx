@@ -100,14 +100,24 @@ function App() {
       return next
     })
 
-    for (let count = 0; count < activeIndices.length; count++) {
-      const index = activeIndices[count]
+    const queue = [...activeIndices]
+    let apiCallQueue = Promise.resolve()
+
+    const callApiThrottled = (url) => {
+      const currentQueue = apiCallQueue
+      apiCallQueue = new Promise(resolve => setTimeout(resolve, 1000))
+      return currentQueue.then(async () => {
+        const apiResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)
+        return apiResponse.json()
+      })
+    }
+
+    const runTask = async (index) => {
       const url = inputs[index].trim()
 
       try {
-        // Step 1: Resolve the TikTok URL to a direct MP4 via TikWM
-        const apiResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)
-        const data = await apiResponse.json()
+        // Step 1: Resolve the TikTok URL to a direct MP4 via TikWM (throttled)
+        const data = await callApiThrottled(url)
 
         if (data.code !== 0 || !data.data || !data.data.play) {
           throw new Error(data.msg || 'Could not resolve this TikTok link.')
@@ -116,8 +126,7 @@ function App() {
         const playUrl = data.data.play
         const videoId = data.data.id || 'tiktok-video'
 
-        // Step 2: Fetch the MP4 directly from TikTok CDN.
-        // TikTok CDN responds with Access-Control-Allow-Origin: * so no proxy is needed.
+        // Step 2: Fetch the MP4 directly from TikTok CDN
         const fileResponse = await fetch(playUrl)
         if (!fileResponse.ok) {
           throw new Error(`Video server returned ${fileResponse.status}. Please try again.`)
@@ -157,13 +166,21 @@ function App() {
           return next
         })
       }
-
-      // Throttle sequential requests to avoid TikWM rate limiting
-      if (count < activeIndices.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 1000))
-      }
     }
 
+    const CONCURRENCY_LIMIT = 3
+    const workers = []
+
+    for (let i = 0; i < Math.min(CONCURRENCY_LIMIT, queue.length); i++) {
+      workers.push((async () => {
+        while (queue.length > 0) {
+          const index = queue.shift()
+          await runTask(index)
+        }
+      })())
+    }
+
+    await Promise.all(workers)
     setIsDownloading(false)
   }
 
