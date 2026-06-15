@@ -105,7 +105,7 @@ function App() {
 
     const callApiThrottled = (url) => {
       const currentQueue = apiCallQueue
-      apiCallQueue = new Promise(resolve => setTimeout(resolve, 1000))
+      apiCallQueue = currentQueue.then(() => new Promise(resolve => setTimeout(resolve, 1000)))
       return currentQueue.then(async () => {
         const apiResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)
         return apiResponse.json()
