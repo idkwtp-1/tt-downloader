@@ -105,11 +105,23 @@ function App() {
 
     const callApiThrottled = (url) => {
       const currentQueue = apiCallQueue
-      apiCallQueue = currentQueue.then(() => new Promise(resolve => setTimeout(resolve, 1000)))
-      return currentQueue.then(async () => {
-        const apiResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)
-        return apiResponse.json()
+      const deferred = new Promise((resolve, reject) => {
+        apiCallQueue = currentQueue
+          .then(async () => {
+            try {
+              const apiResponse = await fetch(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)
+              const data = await apiResponse.json()
+              resolve(data)
+            } catch (err) {
+              reject(err)
+            }
+            await new Promise(r => setTimeout(r, 2500))
+          })
+          .catch(async () => {
+            await new Promise(r => setTimeout(r, 2500))
+          })
       })
+      return deferred
     }
 
     const runTask = async (index) => {
