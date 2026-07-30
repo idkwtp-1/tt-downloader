@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Download } from 'lucide-react'
+import { Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Download, ClipboardPaste } from 'lucide-react'
 import Header from './components/Header'
 import { applyFastStart, renderSlideshowToVideo } from './utils/ffmpegHelper'
 
@@ -9,6 +9,21 @@ function App() {
   const [errors, setErrors] = useState([''])
   const [isDownloading, setIsDownloading] = useState(false)
   const [slideshowData, setSlideshowData] = useState({})
+
+  const handlePaste = async (index) => {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.readText) {
+        console.warn('Clipboard API not available')
+        return
+      }
+      const text = await navigator.clipboard.readText()
+      if (text) {
+        handleInputChange(index, text)
+      }
+    } catch (err) {
+      console.error('Failed to read clipboard contents:', err)
+    }
+  }
 
   const handleInputChange = (index, value) => {
     const newInputs = [...inputs]
@@ -388,9 +403,21 @@ function App() {
                       onChange={(e) => handleInputChange(index, e.target.value)}
                       placeholder={`Paste TikTok URL ${hasMultipleInputs ? index + 1 : ''} here...`}
                       disabled={isDownloading}
-                      className="w-full px-4 py-3 sm:px-5 sm:py-4 bg-tiktok-gray border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-tiktok-cyan focus:ring-1 focus:ring-tiktok-cyan text-sm sm:text-base transition-all disabled:opacity-70 pr-12"
+                      className="w-full px-4 py-3 sm:px-5 sm:py-4 bg-tiktok-gray border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-tiktok-cyan focus:ring-1 focus:ring-tiktok-cyan text-sm sm:text-base transition-all disabled:opacity-70 pr-24"
                     />
-                    <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                      {!url && (
+                        <button
+                          type="button"
+                          onClick={() => handlePaste(index)}
+                          disabled={isDownloading}
+                          className="px-2.5 py-1.5 bg-gray-800 hover:bg-gray-700 text-gray-300 hover:text-white border border-gray-700 hover:border-gray-600 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 shadow-sm active:scale-95 disabled:opacity-50"
+                          title="Paste from clipboard"
+                        >
+                          <ClipboardPaste className="w-3.5 h-3.5 text-tiktok-cyan" />
+                          <span>Paste</span>
+                        </button>
+                      )}
                       {statuses[index] === 'loading' && (
                         <Loader2 className="w-5 h-5 text-tiktok-cyan animate-spin" />
                       )}
