@@ -156,16 +156,25 @@ function App() {
         }
 
         const blob = await fileResponse.blob()
-        const blobUrl = window.URL.createObjectURL(blob)
 
-        const a = document.createElement('a')
-        a.style.display = 'none'
-        a.href = blobUrl
-        a.download = `${videoId}.mp4`
-        document.body.appendChild(a)
-        a.click()
-        document.body.removeChild(a)
-        window.URL.revokeObjectURL(blobUrl)
+        // In PWA standalone mode, <a download> navigates the whole screen instead of
+        // triggering Chrome's download bar. Use the Web Share API (native save sheet) instead.
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+        const videoFile = new File([blob], `${videoId}.mp4`, { type: 'video/mp4' })
+
+        if (isStandalone && navigator.canShare?.({ files: [videoFile] })) {
+          await navigator.share({ files: [videoFile] })
+        } else {
+          const blobUrl = window.URL.createObjectURL(blob)
+          const a = document.createElement('a')
+          a.style.display = 'none'
+          a.href = blobUrl
+          a.download = `${videoId}.mp4`
+          document.body.appendChild(a)
+          a.click()
+          document.body.removeChild(a)
+          window.URL.revokeObjectURL(blobUrl)
+        }
 
         setStatuses(prev => {
           const next = [...prev]
