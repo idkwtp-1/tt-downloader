@@ -1,27 +1,20 @@
 import { useState } from 'react'
 import { Plus, Trash2, Loader2, CheckCircle2, AlertCircle, Download, ClipboardPaste } from 'lucide-react'
 import Header from './components/Header'
-import { applyFastStart, renderSlideshowToVideo } from './utils/ffmpegHelper'
 
 function App() {
   const [inputs, setInputs] = useState([''])
   const [statuses, setStatuses] = useState(['idle'])
   const [errors, setErrors] = useState([''])
   const [isDownloading, setIsDownloading] = useState(false)
-  const [slideshowData, setSlideshowData] = useState({})
 
   const handlePaste = async (index) => {
     try {
-      if (!navigator.clipboard || !navigator.clipboard.readText) {
-        console.warn('Clipboard API not available')
-        return
-      }
+      if (!navigator.clipboard || !navigator.clipboard.readText) return
       const text = await navigator.clipboard.readText()
-      if (text) {
-        handleInputChange(index, text)
-      }
+      if (text) handleInputChange(index, text)
     } catch (err) {
-      console.error('Failed to read clipboard contents:', err)
+      console.error('Failed to read clipboard:', err)
     }
   }
 
@@ -34,12 +27,6 @@ function App() {
 
     const newErrors = [...errors]
     newErrors[index] = ''
-
-    setSlideshowData(prev => {
-      const next = { ...prev }
-      delete next[index]
-      return next
-    })
 
     // Auto-expand inputs up to 10 if typing/pasting in the last input
     if (index === inputs.length - 1 && value.trim() !== '' && inputs.length < 10) {
@@ -64,21 +51,6 @@ function App() {
     const newInputs = inputs.filter((_, i) => i !== index)
     const newStatuses = statuses.filter((_, i) => i !== index)
     const newErrors = errors.filter((_, i) => i !== index)
-
-    setSlideshowData(prev => {
-      const next = {}
-      let targetIdx = 0
-      inputs.forEach((_, i) => {
-        if (i !== index) {
-          if (prev[i]) {
-            next[targetIdx] = prev[i]
-          }
-          targetIdx++
-        }
-      })
-      return next
-    })
-
     setInputs(newInputs.length ? newInputs : [''])
     setStatuses(newStatuses.length ? newStatuses : ['idle'])
     setErrors(newErrors.length ? newErrors : [''])
@@ -88,16 +60,12 @@ function App() {
     const newInputs = []
     const newStatuses = []
     const newErrors = []
-    const newSlideshowData = {}
 
     inputs.forEach((url, i) => {
       if (statuses[i] !== 'success') {
         newInputs.push(url)
         newStatuses.push(statuses[i])
         newErrors.push(errors[i])
-        if (slideshowData[i]) {
-          newSlideshowData[newInputs.length - 1] = slideshowData[i]
-        }
       }
     })
 
@@ -105,7 +73,6 @@ function App() {
       setInputs([''])
       setStatuses(['idle'])
       setErrors([''])
-      setSlideshowData({})
     } else {
       if (newInputs[newInputs.length - 1].trim() !== '' && newInputs.length < 10) {
         newInputs.push('')
@@ -115,124 +82,6 @@ function App() {
       setInputs(newInputs)
       setStatuses(newStatuses)
       setErrors(newErrors)
-      setSlideshowData(newSlideshowData)
-    }
-  }
-
-  const handleDownloadPhotos = async (index) => {
-    const data = slideshowData[index]
-    if (!data) return
-
-    setIsDownloading(true)
-    setStatuses(prev => {
-      const next = [...prev]
-      next[index] = 'loading'
-      return next
-    })
-    setErrors(prev => {
-      const next = [...prev]
-      next[index] = ''
-      return next
-    })
-
-    try {
-      const JSZipModule = await import('https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm')
-      const JSZip = JSZipModule.default
-      const zip = new JSZip()
-
-      for (let i = 0; i < data.images.length; i++) {
-        const res = await fetch(data.images[i])
-        if (!res.ok) throw new Error(`Failed to download image ${i + 1}`)
-        const blob = await res.blob()
-        const contentType = res.headers.get('content-type') || 'image/jpeg'
-        let ext = 'jpg'
-        if (contentType.includes('png')) ext = 'png'
-        else if (contentType.includes('webp')) ext = 'webp'
-        
-        zip.file(`image_${i + 1}.${ext}`, blob)
-      }
-
-      const zipBlob = await zip.generateAsync({ type: 'blob' })
-      const blobUrl = window.URL.createObjectURL(zipBlob)
-      const a = document.createElement('a')
-      a.style.display = 'none'
-      a.href = blobUrl
-      a.download = `${data.id}_photos.zip`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(blobUrl)
-
-      setStatuses(prev => {
-        const next = [...prev]
-        next[index] = 'success'
-        return next
-      })
-    } catch (err) {
-      console.error(err)
-      setStatuses(prev => {
-        const next = [...prev]
-        next[index] = 'choices'
-        return next
-      })
-      setErrors(prev => {
-        const next = [...prev]
-        next[index] = err.message || 'Failed to download photos'
-        return next
-      })
-    } finally {
-      setIsDownloading(false)
-    }
-  }
-
-  const handleRenderVideo = async (index) => {
-    const data = slideshowData[index]
-    if (!data) return
-
-    setIsDownloading(true)
-    setStatuses(prev => {
-      const next = [...prev]
-      next[index] = 'loading'
-      return next
-    })
-    setErrors(prev => {
-      const next = [...prev]
-      next[index] = ''
-      return next
-    })
-
-    try {
-      const videoBlob = await renderSlideshowToVideo(data.images, data.music, 3)
-      const blobUrl = window.URL.createObjectURL(videoBlob)
-
-      const a = document.createElement('a')
-      a.style.display = 'none'
-      a.href = blobUrl
-      a.download = `${data.id}_slideshow.mp4`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(blobUrl)
-
-      setStatuses(prev => {
-        const next = [...prev]
-        next[index] = 'success'
-        return next
-      })
-    } catch (err) {
-      console.error(err)
-      setStatuses(prev => {
-        const next = [...prev]
-        next[index] = 'choices'
-        return next
-      })
-      setErrors(prev => {
-        const next = [...prev]
-        next[index] = err.message || 'Failed to render slideshow'
-        return next
-      })
-    } finally {
-      setIsDownloading(false)
     }
   }
 
@@ -287,52 +136,28 @@ function App() {
       const url = inputs[index].trim()
 
       try {
-        // Step 1: Resolve the TikTok URL via TikWM (throttled)
         const data = await callApiThrottled(url)
 
         if (data.code !== 0 || !data.data) {
           throw new Error(data.msg || 'Could not resolve this TikTok link.')
         }
 
-        const videoId = data.data.id || 'tiktok-video'
-
-        // Check if this is a slideshow (photo post)
-        if (data.data.images && data.data.images.length > 0) {
-          setSlideshowData(prev => ({
-            ...prev,
-            [index]: {
-              images: data.data.images,
-              music: data.data.music || (data.data.music_info && data.data.music_info.play),
-              id: videoId
-            }
-          }))
-          setStatuses(prev => {
-            const next = [...prev]
-            next[index] = 'choices'
-            return next
-          })
-          return
-        }
-
         if (!data.data.play) {
           throw new Error('No playable video found for this TikTok link.')
         }
 
+        const videoId = data.data.id || 'tiktok-video'
         const playUrl = data.data.play
 
-        // Step 2: Fetch the MP4 directly from TikTok CDN
+        // Fetch the MP4 and trigger a save dialog
         const fileResponse = await fetch(playUrl)
         if (!fileResponse.ok) {
           throw new Error(`Video server returned ${fileResponse.status}. Please try again.`)
         }
 
         const blob = await fileResponse.blob()
+        const blobUrl = window.URL.createObjectURL(blob)
 
-        // Fix moov atom + faststart so iPhone plays it natively
-        const optimizedBlob = await applyFastStart(blob)
-        const blobUrl = window.URL.createObjectURL(optimizedBlob)
-
-        // Step 3: Trigger browser save dialog
         const a = document.createElement('a')
         a.style.display = 'none'
         a.href = blobUrl
@@ -393,6 +218,7 @@ function App() {
                 {inputs.length}/10 Links
               </span>
             </div>
+
             {inputs.map((url, index) => (
               <div key={index} className="flex flex-col gap-1">
                 <div className="flex gap-3 items-center">
@@ -421,9 +247,6 @@ function App() {
                       {statuses[index] === 'loading' && (
                         <Loader2 className="w-5 h-5 text-tiktok-cyan animate-spin" />
                       )}
-                      {statuses[index] === 'choices' && (
-                        <CheckCircle2 className="w-5 h-5 text-tiktok-cyan" />
-                      )}
                       {statuses[index] === 'success' && (
                         <CheckCircle2 className="w-5 h-5 text-green-400" />
                       )}
@@ -445,35 +268,6 @@ function App() {
                     </button>
                   )}
                 </div>
-
-                {statuses[index] === 'choices' && slideshowData[index] && (
-                  <div className="mt-2 p-4 bg-tiktok-gray/60 border border-gray-800/80 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-4 animate-fadeIn">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-sm font-semibold text-white">Slideshow Detected</span>
-                      <span className="text-xs text-gray-400">
-                        This link contains {slideshowData[index].images.length} photos with background music.
-                      </span>
-                    </div>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadPhotos(index)}
-                        disabled={isDownloading}
-                        className="flex-1 sm:flex-none px-4 py-2.5 bg-gray-800 hover:bg-gray-700 text-white border border-gray-700 rounded-lg hover:border-gray-600 transition-all text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
-                      >
-                        Download Photos ({slideshowData[index].images.length})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRenderVideo(index)}
-                        disabled={isDownloading}
-                        className="flex-1 sm:flex-none px-4 py-2.5 bg-gradient-to-r from-tiktok-cyan to-tiktok-pink text-white rounded-lg hover:opacity-90 transition-all text-xs font-semibold flex items-center justify-center gap-1.5 disabled:opacity-50"
-                      >
-                        Render Slideshow (MP4)
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {statuses[index] === 'error' && errors[index] && (
                   <p className="text-red-400 text-xs px-2">
@@ -516,12 +310,12 @@ function App() {
                 {isDownloading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Downloading...</span>
+                    <span>Saving...</span>
                   </>
                 ) : (
                   <>
                     <Download className="w-4 h-4" />
-                    <span>{hasMultipleInputs ? 'Download All' : 'Download'}</span>
+                    <span>{hasMultipleInputs ? 'Save All Videos' : 'Save Video'}</span>
                   </>
                 )}
               </button>
