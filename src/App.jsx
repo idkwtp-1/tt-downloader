@@ -346,7 +346,7 @@ function App() {
                           onChange={(e) => handleInputChange(index, e.target.value)}
                           placeholder={`Paste TikTok URL ${hasMultipleInputs ? index + 1 : ''} here...`}
                           disabled={isDownloading}
-                          className="w-full px-4 py-3.5 bg-[#1A1C28] border border-gray-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-tiktok-cyan focus:ring-1 focus:ring-tiktok-cyan text-xs sm:text-sm font-mono transition-all disabled:opacity-70 pr-24 shadow-inner"
+                          className="w-full px-4 py-3.5 bg-[#1A1C28] border border-gray-700/80 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:border-tiktok-cyan focus:ring-1 focus:ring-tiktok-cyan text-base sm:text-sm font-mono transition-all disabled:opacity-70 pr-24 shadow-inner"
                         />
                         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
                           {!url && (
