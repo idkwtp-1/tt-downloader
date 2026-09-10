@@ -208,10 +208,21 @@ function App() {
         const videoId = data.data.id || 'tiktok-video'
         const playUrl = data.data.play
 
-        // Fetch the MP4 and trigger a save dialog
-        const fileResponse = await fetch(playUrl)
-        if (!fileResponse.ok) {
-          throw new Error(`Video server returned ${fileResponse.status}. Please try again.`)
+        // Fetch the MP4 with regional ban bypass fallback (direct CDN first, proxy fallback)
+        let fileResponse
+        try {
+          const controller = new AbortController()
+          const timeoutId = setTimeout(() => controller.abort(), 3500)
+          fileResponse = await fetch(playUrl, { signal: controller.signal })
+          clearTimeout(timeoutId)
+          if (!fileResponse.ok) throw new Error(`Direct CDN status ${fileResponse.status}`)
+        } catch {
+          // Direct connection blocked (e.g. region ban or ISP firewall) -> route through Cloudflare stream proxy
+          const proxyUrl = `https://tt-stream-proxy.ag299842-dbe.workers.dev/?url=${encodeURIComponent(playUrl)}`
+          fileResponse = await fetch(proxyUrl)
+          if (!fileResponse.ok) {
+            throw new Error(`Video server returned ${fileResponse.status}. Please try again.`)
+          }
         }
 
         const blob = await fileResponse.blob()
