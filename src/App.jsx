@@ -195,7 +195,17 @@ function App() {
       const url = inputs[index].trim()
 
       try {
-        const data = await callApiThrottled(url)
+        let data
+        try {
+          // Try direct API call
+          data = await callApiThrottled(url)
+        } catch (apiErr) {
+          // If direct API call fails (tikwm.com blocked by ISP), route API call through proxy
+          console.warn('Direct API call failed, trying via proxy...', apiErr)
+          const proxyApiUrl = `https://tt-stream-proxy.ag299842-dbe.workers.dev/?url=${encodeURIComponent(`https://www.tikwm.com/api/?url=${encodeURIComponent(url)}`)}`
+          const apiRes = await fetch(proxyApiUrl)
+          data = await apiRes.json()
+        }
 
         if (data.code !== 0 || !data.data) {
           throw new Error(data.msg || 'Could not resolve this TikTok link.')
@@ -216,12 +226,13 @@ function App() {
           fileResponse = await fetch(playUrl, { signal: controller.signal })
           clearTimeout(timeoutId)
           if (!fileResponse.ok) throw new Error(`Direct CDN status ${fileResponse.status}`)
-        } catch {
+        } catch (fetchErr) {
+          console.warn('Direct fetch blocked, trying proxy...', fetchErr)
           // Direct connection blocked (e.g. region ban or ISP firewall) -> route through Cloudflare stream proxy
           const proxyUrl = `https://tt-stream-proxy.ag299842-dbe.workers.dev/?url=${encodeURIComponent(playUrl)}`
           fileResponse = await fetch(proxyUrl)
           if (!fileResponse.ok) {
-            throw new Error(`Video server returned ${fileResponse.status}. Please try again.`)
+            throw new Error(`Video proxy returned ${fileResponse.status}.`)
           }
         }
 
@@ -244,6 +255,7 @@ function App() {
         })
       } catch (err) {
         console.error(`Download failed for link ${index + 1}:`, err)
+        alert(`Download failed: ${err.message}`)
         setStatuses(prev => {
           const next = [...prev]
           next[index] = 'error'
