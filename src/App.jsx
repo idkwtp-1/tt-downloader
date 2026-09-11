@@ -245,8 +245,14 @@ function App() {
         a.download = `${videoId}.mp4`
         document.body.appendChild(a)
         a.click()
-        document.body.removeChild(a)
-        window.URL.revokeObjectURL(blobUrl)
+        
+        // Defer revocation so mobile iOS WebKit has time to finish saving the blob
+        setTimeout(() => {
+          try {
+            document.body.removeChild(a)
+            window.URL.revokeObjectURL(blobUrl)
+          } catch {}
+        }, 15000)
 
         setStatuses(prev => {
           const next = [...prev]
